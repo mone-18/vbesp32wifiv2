@@ -233,7 +233,7 @@
     Created by Tech StudyCell
   </footer>
 
-  <!-- Firebase SDKs -->
+<!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
@@ -261,7 +261,7 @@
     const loginBtn = document.getElementById("loginBtn");
     const relayContainer = document.getElementById("relayContainer");
 
-    // 1. Tự động Render 9 Relay Cards vào DOM
+    // 1. Tự động Render 9 Relay Cards
     for (let i = 1; i <= NUM_RELAYS; i++) {
       const card = document.createElement("div");
       card.className = "relay-card";
@@ -274,33 +274,55 @@
       relayContainer.appendChild(card);
     }
 
-    // 2. Xử lý Đăng Nhập
+    // 2. Tự động lắng nghe trạng thái Đăng nhập từ Firebase
+    firebase.auth().onAuthStateChanged((user) => {
+      if (user) {
+        // Đã đăng nhập thành công -> Hiện Dashboard
+        loginForm.style.display = "none";
+        dashboard.style.display = "block";
+        startRelayControl();
+      } else {
+        // Chưa đăng nhập -> Hiện Form Login
+        dashboard.style.display = "none";
+        loginForm.style.display = "block";
+      }
+    });
+
+    // 3. Xử lý sự kiện bấm nút Đăng Nhập
     loginBtn.addEventListener("click", () => {
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value;
 
       if (!email || !password) {
-        alert("Vui lòng nhập Email và Mật khẩu.");
+        alert("Vui lòng nhập đầy đủ Email và Mật khẩu.");
         return;
       }
 
       if (email === allowedEmail && password === allowedPassword) {
+        loginBtn.innerText = "Đang đăng nhập...";
+        loginBtn.disabled = true;
+
         firebase.auth().signInWithEmailAndPassword(email, password)
-          .then(userCredential => {
-            console.log("Signed in as", userCredential.user.email);
-            loginForm.style.display = "none";
-            dashboard.style.display = "block";
-            startRelayControl();
-          })
           .catch(error => {
-            alert("Đăng nhập Firebase thất bại: " + error.message);
+            loginBtn.innerText = "Login";
+            loginBtn.disabled = false;
+            
+            // Hiển thị lỗi chi tiết từ Firebase
+            console.error("Lỗi Firebase Auth:", error);
+            if (error.code === 'auth/operation-not-allowed') {
+              alert("LỖI: Bạn chưa BẬT tính năng 'Email/Password' trong Console Firebase!");
+            } else if (error.code === 'auth/user-not-found') {
+              alert("LỖI: Tài khoản này chưa được TẠO trong Firebase Authentication!");
+            } else {
+              alert("Đăng nhập thất bại: " + error.message);
+            }
           });
       } else {
         alert("Email hoặc Mật khẩu không chính xác.");
       }
     });
 
-    // 3. Quản lý Điều khiển 9 Relay
+    // 4. Quản lý Điều khiển 9 Relay
     function startRelayControl() {
       const db = firebase.database();
       const relays = [];
@@ -315,7 +337,6 @@
         const toggleButton = document.getElementById(`btn${relay.id}`);
         const relayRef = db.ref("/" + relay.path);
 
-        // Đọc dữ liệu Realtime
         relayRef.on("value", (snapshot) => {
           const state = snapshot.val() || false;
           if (state) {
@@ -329,7 +350,6 @@
           }
         });
 
-        // Đảo trạng thái khi bấm nút
         toggleButton.onclick = () => {
           relayRef.get().then(snap => {
             relayRef.set(!snap.val());
@@ -337,38 +357,26 @@
         };
       });
 
-      // Bật Tất Cả
       document.getElementById("allOnBtn").onclick = () => {
         const updates = {};
-        relays.forEach(relay => {
-          updates["/" + relay.path] = true;
-        });
+        relays.forEach(relay => { updates["/" + relay.path] = true; });
         db.ref().update(updates);
       };
 
-      // Tắt Tất Cả
       document.getElementById("allOffBtn").onclick = () => {
         const updates = {};
-        relays.forEach(relay => {
-          updates["/" + relay.path] = false;
-        });
+        relays.forEach(relay => { updates["/" + relay.path] = false; });
         db.ref().update(updates);
       };
     }
 
-    // 4. Xử lý Đăng Xuất
+    // 5. Xử lý Đăng Xuất
     document.getElementById("logoutBtn").onclick = () => {
-      firebase.auth().signOut()
-        .then(() => {
-          dashboard.style.display = "none";
-          loginForm.style.display = "block";
-          document.getElementById("email").value = "";
-          document.getElementById("password").value = "";
-        })
-        .catch(error => {
-          alert("Đăng xuất thất bại: " + error.message);
-        });
+      firebase.auth().signOut().then(() => {
+        loginBtn.innerText = "Login";
+        loginBtn.disabled = false;
+        document.getElementById("email").value = "";
+        document.getElementById("password").value = "";
+      });
     };
   </script>
-</body>
-</html>
