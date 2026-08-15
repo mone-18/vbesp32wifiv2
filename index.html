@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>ESP32 9-Relay Control Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      text-align: center;
+      background-color: #0f172a;
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 0 10px 20px;
+    }
+    h1 {
+      margin-top: 25px;
+      font-size: 1.8rem;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    /* Card styling */
+    .relay-card {
+      background-color: #1e293b;
+      padding: 20px 15px;
+      margin: 12px;
+      border-radius: 16px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      width: 220px;
+      border: 1px solid #334155;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .relay-card.active {
+      border-color: #38bdf8;
+      background: linear-gradient(145deg, #1e293b, #0f2b48);
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+    }
+    .relay-card h2 {
+      margin-bottom: 10px;
+      font-size: 1.2rem;
+      outline: none;
+    }
+    .relay-card p {
+      margin-bottom: 15px;
+      font-size: 0.95rem;
+      color: #94a3b8;
+    }
+    .relay-card p span {
+      font-weight: bold;
+    }
+    .relay-card p span.status-on {
+      color: #22c55e;
+    }
+    .relay-card p span.status-off {
+      color: #ef4444;
+    }
+    .relay-card button {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 10px;
+      color: white;
+      background-color: #334155;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      width: 100%;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .relay-card.active button {
+      background-color: #0284c7;
+    }
+    .relay-card button:hover {
+      opacity: 0.85;
+    }
+
+    /* Master Control Buttons */
+    .master-controls {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin: 20px auto 10px;
+      max-width: 500px;
+      width: 90%;
+    }
+    .btn-master {
+      flex: 1;
+      padding: 12px 20px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      color: white;
+      transition: opacity 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    #allOnBtn {
+      background-color: #0284c7;
+    }
+    #allOffBtn {
+      background-color: #d32f2f;
+    }
+    #logoutBtn {
+      background-color: #475569;
+      max-width: 500px;
+      width: 90%;
+      margin: 10px auto;
+    }
+    .btn-master:hover, #logoutBtn:hover {
+      opacity: 0.85;
+    }
+
+    /* Login Form */
+    #dashboard {
+      display: none;
+    }
+    #loginForm {
+      max-width: 380px;
+      margin: 80px auto 20px;
+      background: #1e293b;
+      padding: 30px 25px;
+      border-radius: 16px;
+      border: 1px solid #334155;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    #loginForm h2 {
+      margin-bottom: 20px;
+      color: #38bdf8;
+    }
+    #loginForm input {
+      width: 100%;
+      padding: 12px 15px;
+      margin: 10px 0 20px;
+      font-size: 1rem;
+      border: 1px solid #334155;
+      background-color: #0f172a;
+      color: white;
+      border-radius: 10px;
+      outline: none;
+      transition: border-color 0.3s ease;
+    }
+    #loginForm input:focus {
+      border-color: #38bdf8;
+    }
+    #loginForm button {
+      width: 100%;
+      background-color: #0284c7;
+      color: white;
+      padding: 12px;
+      font-size: 17px;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    #loginForm button:hover {
+      background-color: #0369a1;
+    }
+
+    #dashboard .relay-container {
+      max-width: 1000px;
+      margin: 20px auto 0;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    @media (max-width: 700px) {
+      .relay-card {
+        width: 90%;
+        margin: 10px auto;
+      }
+    }
+    footer {
+      font-size: 0.9rem;
+      color: #64748b;
+      padding: 15px 0 0;
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1><i class="fa-solid fa-bolt"></i> ESP32 Relay Control</h1>
+
+  <!-- Login Form -->
+  <div id="loginForm">
+    <h2>Đăng Nhập</h2>
+    <input type="email" id="email" placeholder="Nhập Email" required />
+    <input type="password" id="password" placeholder="Nhập Mật khẩu" required />
+    <button id="loginBtn">Login</button>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard">
+    <div class="relay-container" id="relayContainer">
+      <!-- 9 Relay Cards được tạo tự động bằng JS -->
+    </div>
+
+    <div class="master-controls">
+      <button id="allOnBtn" class="btn-master"><i class="fa-solid fa-power-off"></i> Bật Tất Cả</button>
+      <button id="allOffBtn" class="btn-master"><i class="fa-solid fa-power-off"></i> Tắt Tất Cả</button>
+    </div>
+    <button id="logoutBtn" class="btn-master"><i class="fa-solid fa-right-from-bracket"></i> Đăng Xuất</button>
+  </div>
+
+  <footer>
+    Created by Tech StudyCell
+  </footer>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+
+  <script>
+    // Firebase Config
+    const firebaseConfig = { 
+  apiKey : "AIzaSyBqwExVzSi26SvxlFgM01jyznVLiipRniA" , 
+  authDomain : "vb-esp32wifi-v2.firebaseapp.com" , 
+  URL cơ sở dữ liệu : "https://vb-esp32wifi-v2-default-rtdb.europe-west1.firebasedatabase.app" , 
+  dự ánId : "vb-esp32wifi-v2" , 
+  storageBucket : "vb-esp32wifi-v2.firebasestorage.app" , 
+  messagingSenderId : "416300461950" , 
+  appId : "1:416300461950:web:9d2723f1de71b4bf0fcd2f" 
+};
+
+    firebase.initializeApp(firebaseConfig);
+
+    const allowedEmail = "vanmai752@gmail.com";
+    const allowedPassword = "vbac1806";
+    const NUM_RELAYS = 9;
+
+    const loginForm = document.getElementById("loginForm");
+    const dashboard = document.getElementById("dashboard");
+    const loginBtn = document.getElementById("loginBtn");
+    const relayContainer = document.getElementById("relayContainer");
+
+    // 1. Tự động Render 9 Relay Cards vào DOM
+    for (let i = 1; i <= NUM_RELAYS; i++) {
+      const card = document.createElement("div");
+      card.className = "relay-card";
+      card.id = `card${i}`;
+      card.innerHTML = `
+        <h2 contenteditable="true" spellcheck="false">Relay ${i}</h2>
+        <p>Status: <span id="status${i}" class="status-off">Loading...</span></p>
+        <button id="btn${i}"><i class="fa-solid fa-power-off"></i> Toggle</button>
+      `;
+      relayContainer.appendChild(card);
+    }
+
+    // 2. Xử lý Đăng Nhập
+    loginBtn.addEventListener("click", () => {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      if (!email || !password) {
+        alert("Vui lòng nhập Email và Mật khẩu.");
+        return;
+      }
+
+      if (email === allowedEmail && password === allowedPassword) {
+        firebase.auth().signInWithEmailAndPassword(email, password)
+          .then(userCredential => {
+            console.log("Signed in as", userCredential.user.email);
+            loginForm.style.display = "none";
+            dashboard.style.display = "block";
+            startRelayControl();
+          })
+          .catch(error => {
+            alert("Đăng nhập Firebase thất bại: " + error.message);
+          });
+      } else {
+        alert("Email hoặc Mật khẩu không chính xác.");
+      }
+    });
+
+    // 3. Quản lý Điều khiển 9 Relay
+    function startRelayControl() {
+      const db = firebase.database();
+      const relays = [];
+
+      for (let i = 1; i <= NUM_RELAYS; i++) {
+        relays.push({ id: i, path: `relay${i}` });
+      }
+
+      relays.forEach(relay => {
+        const card = document.getElementById(`card${relay.id}`);
+        const statusText = document.getElementById(`status${relay.id}`);
+        const toggleButton = document.getElementById(`btn${relay.id}`);
+        const relayRef = db.ref("/" + relay.path);
+
+        // Đọc dữ liệu Realtime
+        relayRef.on("value", (snapshot) => {
+          const state = snapshot.val() || false;
+          if (state) {
+            statusText.innerText = "ON";
+            statusText.className = "status-on";
+            card.classList.add("active");
+          } else {
+            statusText.innerText = "OFF";
+            statusText.className = "status-off";
+            card.classList.remove("active");
+          }
+        });
+
+        // Đảo trạng thái khi bấm nút
+        toggleButton.onclick = () => {
+          relayRef.get().then(snap => {
+            relayRef.set(!snap.val());
+          });
+        };
+      });
+
+      // Bật Tất Cả
+      document.getElementById("allOnBtn").onclick = () => {
+        const updates = {};
+        relays.forEach(relay => {
+          updates["/" + relay.path] = true;
+        });
+        db.ref().update(updates);
+      };
+
+      // Tắt Tất Cả
+      document.getElementById("allOffBtn").onclick = () => {
+        const updates = {};
+        relays.forEach(relay => {
+          updates["/" + relay.path] = false;
+        });
+        db.ref().update(updates);
+      };
+    }
+
+    // 4. Xử lý Đăng Xuất
+    document.getElementById("logoutBtn").onclick = () => {
+      firebase.auth().signOut()
+        .then(() => {
+          dashboard.style.display = "none";
+          loginForm.style.display = "block";
+          document.getElementById("email").value = "";
+          document.getElementById("password").value = "";
+        })
+        .catch(error => {
+          alert("Đăng xuất thất bại: " + error.message);
+        });
+    };
+  </script>
+</body>
+</html>
